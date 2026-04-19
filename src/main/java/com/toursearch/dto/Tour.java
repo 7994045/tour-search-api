@@ -9,7 +9,6 @@ public class Tour {
     private Double price;
     private String bookUrl;
     
-    // геттеры и сеттеры
     public String getHotelName() { return hotelName; }
     public void setHotelName(String hotelName) { this.hotelName = hotelName; }
     public Double getRating() { return rating; }
