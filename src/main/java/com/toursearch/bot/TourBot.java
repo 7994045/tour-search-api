@@ -6,17 +6,17 @@ import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import org.telegram.telegrambots.client.okhttp.OkHttpTelegramBotClient;
-import org.telegram.telegrambots.client.okhttp.OkHttpBotSessionProvider;
-import org.telegram.telegrambots.meta.TelegramBotsApi;
 import org.telegram.telegrambots.meta.generics.LongPollingBot;
 
 @Component
 public class TourBot implements LongPollingBot {
+
     private final OkHttpTelegramBotClient botClient;
-    private final String botToken = "YOUR_TOKEN_HERE";
+    private final String botToken;
+    private final String botUsername = "germes_travel_bot";
 
-
-    public TourBot() {
+    public TourBot(@Value("${telegram.bot.token}") String botToken) {
+        this.botToken = botToken;
         this.botClient = new OkHttpTelegramBotClient(botToken);
     }
 
@@ -25,7 +25,6 @@ public class TourBot implements LongPollingBot {
         if (update.hasMessage() && update.getMessage().hasText()) {
             String messageText = update.getMessage().getText();
             long chatId = update.getMessage().getChatId();
-            
             String response = processMessage(messageText);
             sendMessage(chatId, response);
         }
