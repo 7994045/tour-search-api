@@ -2,31 +2,33 @@ package com.toursearch.bot;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
-import org.telegram.telegrambots.client.okhttp.OkHttpBotSessionProvider;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
+import org.telegram.telegrambots.client.okhttp.OkHttpTelegramBotClient;
 import org.telegram.telegrambots.meta.generics.LongPollingBot;
-import org.telegram.telegrambots.meta.generics.SessionIterator;
 
 @Component
 public class TourBot implements LongPollingBot {
 
+    private final OkHttpTelegramBotClient botClient;
+
     @Value("${telegram.bot.token}")
     private String botToken;
 
+    public TourBot(@Value("${telegram.bot.token}") String botToken) {
+        this.botToken = botToken;
+        this.botClient = new OkHttpTelegramBotClient(botToken);
+    }
+
     @Override
-    public void onUpdatesReceived(SessionIterator sessionIterator) {
-        while (sessionIterator.hasNext()) {
-            Update update = sessionIterator.next();
+    public void consume(Update update) {
+        if (update.hasMessage() && update.getMessage().hasText()) {
+            String messageText = update.getMessage().getText();
+            long chatId = update.getMessage().getChatId();
             
-            if (update.hasMessage() && update.getMessage().hasText()) {
-                String messageText = update.getMessage().getText();
-                long chatId = update.getMessage().getChatId();
-                
-                String response = processMessage(messageText);
-                sendMessage(chatId, response);
-            }
+            String response = processMessage(messageText);
+            sendMessage(chatId, response);
         }
     }
 
@@ -41,10 +43,11 @@ public class TourBot implements LongPollingBot {
 
     private void sendMessage(long chatId, String text) {
         try {
-            SendMessage message = new SendMessage();
-            message.setChatId(chatId);
-            message.setText(text);
-            execute(message);
+            SendMessage message = SendMessage.builder()
+                .chatId(chatId)
+                .text(text)
+                .build();
+            botClient.execute(message);
         } catch (TelegramApiException e) {
             System.err.println("Error sending message: " + e.getMessage());
         }
