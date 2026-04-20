@@ -28,7 +28,7 @@ public class TourController {
         }
         
         // Filter by max price
-        if (request.getMaxPrice() > 0) {
+        if (request.getMaxPrice() != null && request.getMaxPrice() > 0) {
             allTours = allTours.stream()
                 .filter(t -> t.getPrice() <= request.getMaxPrice())
                 .collect(Collectors.toList());
