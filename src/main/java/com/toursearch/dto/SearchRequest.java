@@ -7,6 +7,7 @@ public class SearchRequest {
     private String dateTo;
     private Integer nights;
     private Integer adults;
+    private Integer maxPrice;
     
     public String getFrom() { return from; }
     public void setFrom(String from) { this.from = from; }
@@ -20,4 +21,6 @@ public class SearchRequest {
     public void setNights(Integer nights) { this.nights = nights; }
     public Integer getAdults() { return adults; }
     public void setAdults(Integer adults) { this.adults = adults; }
+    public Integer getMaxPrice() { return maxPrice; }
+    public void setMaxPrice(Integer maxPrice) { this.maxPrice = maxPrice; }
 }
