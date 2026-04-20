@@ -2,26 +2,22 @@ package com.toursearch.bot;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
-import org.telegram.telegrambots.client.okhttp.OkHttpTelegramBotClient;
-import org.telegram.telegrambots.meta.generics.LongPollingBot;
 
 @Component
-public class TourBot implements LongPollingBot {
+public class TourBot extends TelegramLongPollingBot {
 
-    private final OkHttpTelegramBotClient botClient;
-    private final String botToken;
-    private final String botUsername = "germes_travel_bot";
+    @Value("${telegram.bot.token}")
+    private String botToken;
 
-    public TourBot(@Value("${telegram.bot.token}") String botToken) {
-        this.botToken = botToken;
-        this.botClient = new OkHttpTelegramBotClient(botToken);
-    }
+    @Value("${telegram.bot.username}")
+    private String botUsername;
 
     @Override
-    public void consume(Update update) {
+    public void onUpdateReceived(Update update) {
         if (update.hasMessage() && update.getMessage().hasText()) {
             String messageText = update.getMessage().getText();
             long chatId = update.getMessage().getChatId();
@@ -45,24 +41,19 @@ public class TourBot implements LongPollingBot {
                 .chatId(chatId)
                 .text(text)
                 .build();
-            botClient.execute(message);
+            execute(message);
         } catch (TelegramApiException e) {
             System.err.println("Error sending message: " + e.getMessage());
         }
     }
 
     @Override
+    public String getBotUsername() {
+        return botUsername;
+    }
+
+    @Override
     public String getBotToken() {
         return botToken;
-    }
-
-    @Override
-    public void onRegister() {
-        System.out.println("TourBot registered!");
-    }
-
-    @Override
-    public void onClosing() {
-        System.out.println("TourBot closing!");
     }
 }
