@@ -10,11 +10,11 @@ import org.telegram.telegrambots.client.okhttp.OkHttpBotSessionProvider;
 import org.telegram.telegrambots.meta.TelegramBotsApi;
 import org.telegram.telegrambots.meta.generics.LongPollingBot;
 
-
 @Component
 public class TourBot implements LongPollingBot {
     private final OkHttpTelegramBotClient botClient;
     private final String botToken = "YOUR_TOKEN_HERE";
+
 
     public TourBot() {
         this.botClient = new OkHttpTelegramBotClient(botToken);
