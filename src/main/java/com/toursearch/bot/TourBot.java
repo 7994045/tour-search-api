@@ -5,19 +5,16 @@ import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
-import org.telegram.telegrambots.client.okhttp.OkHttpTelegramBotClient;
+import org.telegram.telegrambots.client.OkHttpTelegramBotClient;
 import org.telegram.telegrambots.meta.generics.LongPollingBot;
+
 
 @Component
 public class TourBot implements LongPollingBot {
 
     private final OkHttpTelegramBotClient botClient;
 
-    @Value("${telegram.bot.token}")
-    private String botToken;
-
     public TourBot(@Value("${telegram.bot.token}") String botToken) {
-        this.botToken = botToken;
         this.botClient = new OkHttpTelegramBotClient(botToken);
     }
 
@@ -55,7 +52,7 @@ public class TourBot implements LongPollingBot {
 
     @Override
     public String getBotToken() {
-        return botToken;
+        return botClient.getBotToken();
     }
 
     @Override
