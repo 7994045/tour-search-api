@@ -3,28 +3,21 @@ package com.toursearch.config;
 import com.toursearch.bot.TourBot;
 import org.springframework.context.annotation.Configuration;
 import org.telegram.telegrambots.meta.TelegramBotsApi;
-import org.telegram.telegrambots.meta.api.objects.commands.BotCommand;
-import org.telegram.telegrambots.meta.api.objects.commands.scope.BotCommandScopeDefault;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
-import org.telegram.telegrambots.client.okhttp.OkHttpBotSessionProvider;
+import org.telegram.telegrambots.service.LongPollingService;
 import jakarta.annotation.PostConstruct;
-import java.util.List;
 
 @Configuration
 public class TelegramBotConfig {
 
     private final TourBot tourBot;
-
-
     public TelegramBotConfig(TourBot tourBot) {
         this.tourBot = tourBot;
     }
-
     @PostConstruct
     public void initBot() {
         try {
-            TelegramBotsApi botsApi = new TelegramBotsApi(OkHttpBotSessionProvider.class);
-            botsApi.registerBot(tourBot);
+            LongPollingService.registerBot(tourBot);
             System.out.println("Telegram bot registered successfully!");
         } catch (TelegramApiException e) {
             System.err.println("Error registering Telegram bot: " + e.getMessage());
