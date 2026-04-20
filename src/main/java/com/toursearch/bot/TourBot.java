@@ -1,21 +1,19 @@
 package com.toursearch.bot;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
-import org.telegram.telegrambots.client.OkHttpTelegramBotClient;
+import org.telegram.telegrambots.client.okhttp.OkHttpTelegramBotClient;
 import org.telegram.telegrambots.meta.generics.LongPollingBot;
-
 
 @Component
 public class TourBot implements LongPollingBot {
 
     private final OkHttpTelegramBotClient botClient;
 
-    public TourBot(@Value("${telegram.bot.token}") String botToken) {
-        this.botClient = new OkHttpTelegramBotClient(botToken);
+    public TourBot() {
+        this.botClient = new OkHttpTelegramBotClient("YOUR_TOKEN_HERE");
     }
 
     @Override
