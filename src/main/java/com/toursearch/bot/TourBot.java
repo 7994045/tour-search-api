@@ -1,27 +1,29 @@
 package com.toursearch.bot;
 
+import com.toursearch.tour_search_api.TourDto;
+import com.toursearch.tour_search_api.TourSearchController;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Component;
-import org.springframework.web.client.RestTemplate;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
-import java.util.*;
+import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-@Component
 public class TourBot extends TelegramLongPollingBot {
 
-    @Value("${telegram.bot.token}")
-    private String botToken;
-
-    @Value("${telegram.bot.username}")
-    private String botUsername;
-
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final String botToken;
+    private final String botUsername;
+    private final TourSearchController tourSearchController;
     private final Set<Long> awaitingCountry = ConcurrentHashMap.newKeySet();
+
+    public TourBot(TourSearchController tourSearchController) {
+        this.tourSearchController = tourSearchController;
+        this.botToken = System.getProperty("telegram.bot.token", "");
+        this.botUsername = "germes_travel_bot";
+    }
 
     @Override
     public void onUpdateReceived(Update update) {
@@ -49,39 +51,23 @@ public class TourBot extends TelegramLongPollingBot {
 
     private void searchTours(long chatId, String country) {
         try {
-            String url = "http://localhost:8080/api/tours/search?country=" + country;
-            String result = restTemplate.getForObject(url, String.class);
-            if (result == null || result.isEmpty() || "[]".equals(result)) {
+            List<TourDto> tours = tourSearchController.search(country, null, "", 7, 2, 0).getBody();
+            if (tours == null || tours.isEmpty()) {
                 sendMessage(chatId, "Туры в \"" + country + "\" не найдены. Попробуйте другую страну.");
             } else {
-                sendMessage(chatId, "Туры в \"" + country + "\":\n\n" + formatResults(result));
+                StringBuilder sb = new StringBuilder();
+                sb.append("Туры в \"").append(country).append("\":\n\n");
+                int count = 1;
+                for (TourDto t : tours) {
+                    sb.append(count++).append(". ").append(t.getHotelName()).append("\n");
+                    sb.append("   ").append(t.getCity()).append(" | ⭐").append(t.getRating()).append("\n");
+                    sb.append("   ").append(t.getPrice()).append(" ₽\n\n");
+                }
+                sb.append("/search - новый поиск");
+                sendMessage(chatId, sb.toString());
             }
         } catch (Exception e) {
             sendMessage(chatId, "Ошибка при поиске туров. Попробуйте позже.\n/search - повторить поиск");
-        }
-    }
-
-    private String formatResults(String json) {
-        try {
-            json = json.replace("[", "").replace("]", "").replace("{", "").replace("}", "");
-            String[] items = json.split("\\},\\{");
-            StringBuilder sb = new StringBuilder();
-            int count = 1;
-            for (String item : items) {
-                sb.append(count++).append(". ");
-                String[] fields = item.split(",");
-                for (String field : fields) {
-                    field = field.trim().replace("\"", "");
-                    if (field.contains(":")) {
-                        String[] kv = field.split(":", 2);
-                        sb.append(kv[0]).append(": ").append(kv[1]).append("\n");
-                    }
-                }
-                sb.append("\n");
-            }
-            return sb.toString();
-        } catch (Exception e) {
-            return json;
         }
     }
 

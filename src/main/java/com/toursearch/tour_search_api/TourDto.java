@@ -1,9 +1,7 @@
-        package com.toursearch.tour_search_api;
+package com.toursearch.tour_search_api;
 
-
-
-import lombok.Data;
 import lombok.Builder;
+import lombok.Data;
 
 @Data
 @Builder
@@ -16,5 +14,3 @@ public class TourDto {
     private String hotelImage;
     private String bookUrl;
 }
-
-
