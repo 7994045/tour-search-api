@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Germes Travel — Поиск туров</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        :root {
+            --bg: var(--tg-theme-bg-color, #1a1a2e);
+            --text: var(--tg-theme-text-color, #eee);
+            --hint: var(--tg-theme-hint-color, #888);
+            --accent: var(--tg-theme-button-color, #e94560);
+            --card: var(--tg-theme-secondary-bg-color, #16213e);
+            --border: var(--tg-theme-outline-color, #333);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 16px;
+        }
+
+        .header {
+            text-align: center;
+            padding: 20px 0 24px;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .header p {
+            color: var(--hint);
+            font-size: 14px;
+        }
+
+        .search-box {
+            background: var(--card);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 16px;
+        }
+
+        .input-group {
+            margin-bottom: 12px;
+        }
+
+        .input-group label {
+            display: block;
+            font-size: 13px;
+            color: var(--hint);
+            margin-bottom: 6px;
+        }
+
+        .input-group input, .input-group select {
+            width: 100%;
+            padding: 12px 14px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background: var(--bg);
+            color: var(--text);
+            font-size: 15px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .input-group input:focus, .input-group select:focus {
+            border-color: var(--accent);
+        }
+
+        .row {
+            display: flex;
+            gap: 12px;
+        }
+
+        .row .input-group { flex: 1; }
+
+        .btn {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 12px;
+            background: var(--accent);
+            color: #fff;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        .btn:hover { opacity: 0.9; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .results {
+            margin-top: 8px;
+        }
+
+        .tour-card {
+            background: var(--card);
+            border-radius: 14px;
+            padding: 16px;
+            margin-bottom: 12px;
+            border: 1px solid var(--border);
+            transition: transform 0.15s;
+        }
+
+        .tour-card:active { transform: scale(0.98); }
+
+        .tour-card .hotel {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .tour-card .meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+
+        .tag {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 8px;
+            font-size: 12px;
+            background: rgba(233, 69, 96, 0.15);
+            color: var(--accent);
+        }
+
+        .tour-card .price {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--accent);
+        }
+
+        .tour-card .price span {
+            font-size: 13px;
+            font-weight: 400;
+            color: var(--hint);
+        }
+
+        .empty {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--hint);
+        }
+
+        .empty .icon { font-size: 48px; margin-bottom: 12px; }
+
+        .loader {
+            text-align: center;
+            padding: 32px;
+            color: var(--hint);
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 28px; height: 28px;
+            border: 3px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .quick-countries {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .quick-countries button {
+            padding: 8px 14px;
+            border-radius: 20px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text);
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .quick-countries button:hover,
+        .quick-countries button.active {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: #fff;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>✈️ Germes Travel</h1>
+        <p>Найди лучший тур по выгодной цене</p>
+    </div>
+
+    <div class="search-box">
+        <div class="quick-countries" id="quickCountries">
+            <button onclick="selectCountry('Турция')">🇹🇷 Турция</button>
+            <button onclick="selectCountry('Египет')">🇪🇬 Египет</button>
+            <button onclick="selectCountry('ОАЭ')">🇦🇪 ОАЭ</button>
+            <button onclick="selectCountry('Таиланд')">🇹🇭 Таиланд</button>
+            <button onclick="selectCountry('Шри-Ланка')">🇱🇰 Шри-Ланка</button>
+        </div>
+
+        <div class="input-group">
+            <label>Куда</label>
+            <input type="text" id="country" placeholder="Страна или город">
+        </div>
+
+        <div class="row">
+            <div class="input-group">
+                <label>Дата заезда</label>
+                <input type="date" id="dateFrom">
+            </div>
+            <div class="input-group">
+                <label>Ночей</label>
+                <input type="number" id="nights" value="7" min="1" max="30">
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="input-group">
+                <label>Взрослых</label>
+                <input type="number" id="adults" value="2" min="1" max="6">
+            </div>
+            <div class="input-group">
+                <label>Детей</label>
+                <input type="number" id="children" value="0" min="0" max="4">
+            </div>
+        </div>
+
+        <button class="btn" id="searchBtn" onclick="search()">Найти туры</button>
+    </div>
+
+    <div id="results" class="results"></div>
+
+    <script>
+        const tg = window.Telegram?.WebApp;
+        if (tg) {
+            tg.ready();
+            tg.expand();
+            tg.setHeaderColor('var(--tg-theme-bg-color)');
+        }
+
+        const API = window.location.origin + '/api/tours/search';
+
+        function selectCountry(name) {
+            document.getElementById('country').value = name;
+            document.querySelectorAll('.quick-countries button').forEach(b => {
+                b.classList.toggle('active', b.textContent.includes(name));
+            });
+        }
+
+        async function search() {
+            const country = document.getElementById('country').value.trim();
+            if (!country) {
+                document.getElementById('country').style.borderColor = '#e94560';
+                return;
+            }
+
+            const btn = document.getElementById('searchBtn');
+            btn.disabled = true;
+            btn.textContent = 'Ищем...';
+
+            const results = document.getElementById('results');
+            results.innerHTML = '<div class="loader"><div class="spinner"></div><p style="margin-top:12px">Ищем лучшие туры...</p></div>';
+
+            const params = new URLSearchParams({
+                country,
+                dateFrom: document.getElementById('dateFrom').value || '',
+                nights: document.getElementById('nights').value || '7',
+                adults: document.getElementById('adults').value || '2',
+                children: document.getElementById('children').value || '0'
+            });
+
+            try {
+                const res = await fetch(API + '?' + params);
+                if (!res.ok) throw new Error(res.status);
+                const tours = await res.json();
+
+                if (!tours.length) {
+                    results.innerHTML = '<div class="empty"><div class="icon">🔍</div><p>Туров не найдено.<br>Попробуйте другие параметры</p></div>';
+                } else {
+                    results.innerHTML = tours.map(t => `
+                        <div class="tour-card">
+                            <div class="hotel">${t.hotelName || t.name || 'Тур'}</div>
+                            <div class="meta">
+                                <span class="tag">${t.country || country}</span>
+                                <span class="tag">${t.resort || t.city || ''}</span>
+                                <span class="tag">⭐ ${t.stars || '—'}</span>
+                                <span class="tag">${t.nights || '?'} ночей</span>
+                                <span class="tag">${t.meal || '—'}</span>
+                            </div>
+                            <div class="price">${t.price ? t.price.toLocaleString() + ' ₽' : 'Цена по запросу'} <span>/ за ${t.adults || 2} взр.</span></div>
+                        </div>
+                    `).join('');
+                }
+            } catch (e) {
+                results.innerHTML = '<div class="empty"><div class="icon">⚠️</div><p>Ошибка загрузки.<br>Попробуйте позже</p></div>';
+            }
+
+            btn.disabled = false;
+            btn.textContent = 'Найти туры';
+        }
+
+        // Set default date to tomorrow
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        document.getElementById('dateFrom').value = tomorrow.toISOString().split('T')[0];
+    </script>
+</body>
+</html>
