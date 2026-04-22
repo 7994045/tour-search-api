@@ -1,6 +1,7 @@
 package com.toursearch.bot;
 
 import com.toursearch.service.StatsService;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
@@ -13,17 +14,19 @@ import java.time.format.DateTimeFormatter;
 @Component
 public class AdminBot extends TelegramLongPollingBot {
 
-    private final String botToken;
-    private final String botUsername;
-    private final Long adminChatId;
+    @Value("${admin.bot.token:}")
+    private String botToken;
+
+    @Value("${admin.bot.username:GT_main_bot}")
+    private String botUsername;
+
+    @Value("${admin.chat.id:0}")
+    private Long adminChatId;
+
     private final StatsService statsService;
 
     public AdminBot(StatsService statsService) {
         this.statsService = statsService;
-        this.botToken = System.getProperty("admin.bot.token", System.getenv("ADMIN_BOT_TOKEN"));
-        this.botUsername = System.getProperty("admin.bot.username", "GT_main_bot");
-        String chatIdStr = System.getProperty("admin.chat.id", System.getenv("ADMIN_CHAT_ID"));
-        this.adminChatId = (chatIdStr != null && !chatIdStr.isEmpty()) ? Long.parseLong(chatIdStr) : 0L;
     }
 
     @Override
@@ -35,11 +38,11 @@ public class AdminBot extends TelegramLongPollingBot {
         String text = message.getText().trim();
 
         if ("/start".equals(text)) {
-            sendMessage(chatId, "\u2714\ufe0f Admin Bot Germes Travel\n\u0412\u0430\u0448 chat_id: " + chatId + "\n\u0423\u043a\u0430\u0436\u0438\u0442\u0435 \u0435\u0433\u043e \u0432 ADMIN_CHAT_ID");
+            sendMessage(chatId, "\u2705 Admin Bot Germes Travel\n\u0412\u0430\u0448 chat_id: " + chatId + "\n\u0423\u043a\u0430\u0436\u0438\u0442\u0435 \u0435\u0433\u043e \u0432 ADMIN_CHAT_ID");
             return;
         }
 
-        if (adminChatId == 0 || chatId != adminChatId) return;
+        if (adminChatId == null || adminChatId == 0 || chatId != adminChatId) return;
 
         switch (text) {
             case "/stats":
@@ -78,7 +81,7 @@ public class AdminBot extends TelegramLongPollingBot {
     }
 
     private void sendRecentErrors(long chatId) {
-        StringBuilder sb = new StringBuilder("\u274c \u041f\u043e\u0441\u043b\u0435\u0434\u043d\u0438\u0435 \u043e\u0448\u0438\u0431\u043a\u0438:\n\n");
+        StringBuilder sb = new StringBuilder("\ud83d\udd0d \u041f\u043e\u0441\u043b\u0435\u0434\u043d\u0438\u0435 \u043e\u0448\u0438\u0431\u043a\u0438:\n\n");
         DateTimeFormatter fmt = DateTimeFormatter.ofPattern("dd.MM HH:mm");
         for (StatsService.ErrorRecord r : statsService.getRecentErrors()) {
             sb.append("\u2022 ").append(r.message).append(" \u2014 ").append(r.time.format(fmt)).append("\n");
@@ -97,7 +100,7 @@ public class AdminBot extends TelegramLongPollingBot {
     }
 
     public void notifyAdmin(String message) {
-        if (adminChatId != 0) sendMessage(adminChatId, message);
+        if (adminChatId != null && adminChatId != 0) sendMessage(adminChatId, message);
     }
 
     private void sendMessage(long chatId, String text) {

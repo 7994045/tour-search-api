@@ -1,9 +1,9 @@
 package com.toursearch.bot;
 
-import com.toursearch.service.AdminNotificationService;
 import com.toursearch.service.StatsService;
 import com.toursearch.tour_search_api.TourDto;
 import com.toursearch.tour_search_api.TourSearchController;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Update;
@@ -16,75 +16,64 @@ import java.util.concurrent.ConcurrentHashMap;
 public class TourBot extends TelegramLongPollingBot {
 
     private final String botToken;
-    private final String botUsername;
+    private final String botUsername = "germes_travel_bot";
     private final TourSearchController tourSearchController;
-    private final StatsService statsService;
-    private final AdminNotificationService notificationService;
+
+    @Autowired
+    private StatsService statsService;
+
     private final Set<Long> awaitingCountry = ConcurrentHashMap.newKeySet();
 
-    public TourBot(TourSearchController tourSearchController, StatsService statsService,
-                   AdminNotificationService notificationService) {
+    public TourBot(TourSearchController tourSearchController, String botToken) {
         this.tourSearchController = tourSearchController;
-        this.statsService = statsService;
-        this.notificationService = notificationService;
-        this.botToken = System.getProperty("telegram.bot.token", "");
-        this.botUsername = "germes_travel_bot";
+        this.botToken = botToken;
     }
 
     @Override
     public void onUpdateReceived(Update update) {
-        if (update.hasMessage() && update.getMessage().hasText()) {
-            String messageText = update.getMessage().getText().trim();
-            long chatId = update.getMessage().getChatId();
-            String username = update.getMessage().getFrom().getUserName();
+        if (!update.hasMessage() || !update.getMessage().hasText()) return;
 
-            if (awaitingCountry.contains(chatId)) {
-                awaitingCountry.remove(chatId);
-                searchTours(chatId, messageText, username);
-                return;
-            }
+        String messageText = update.getMessage().getText().trim();
+        long chatId = update.getMessage().getChatId();
 
-            switch (messageText) {
-                case "/start" -> {
-                    statsService.recordUser(chatId, username);
-                    notificationService.notifyNewUser(chatId, username);
-                    sendMessage(chatId, "Привет! Я бот для поиска туров. Нажми /search для поиска.");
-                }
-                case "/help" -> sendMessage(chatId, "Доступные команды:\n/start — начать\n/search — поиск туров\n/help — помощь");
-                case "/search" -> {
-                    awaitingCountry.add(chatId);
-                    sendMessage(chatId, "Введите страну для поиска туров (например: Турция, Египет, ОАЭ)");
-                }
-                default -> sendMessage(chatId, "Не понял. Используйте /help");
+        if (awaitingCountry.contains(chatId)) {
+            awaitingCountry.remove(chatId);
+            searchTours(chatId, messageText);
+            return;
+        }
+
+        switch (messageText) {
+            case "/start" -> sendMessage(chatId, "\u041f\u0440\u0438\u0432\u0435\u0442! \u042f \u0431\u043e\u0442 \u0434\u043b\u044f \u043f\u043e\u0438\u0441\u043a\u0430 \u0442\u0443\u0440\u043e\u0432. \u041d\u0430\u0436\u043c\u0438 /search \u0434\u043b\u044f \u043f\u043e\u0438\u0441\u043a\u0430.");
+            case "/help" -> sendMessage(chatId, "\u0414\u043e\u0441\u0442\u0443\u043f\u043d\u044b\u0435 \u043a\u043e\u043c\u0430\u043d\u0434\u044b:\n/start \u2014 \u043d\u0430\u0447\u0430\u0442\u044c\n/search \u2014 \u043f\u043e\u0438\u0441\u043a \u0442\u0443\u0440\u043e\u0432\n/help \u2014 \u043f\u043e\u043c\u043e\u0449\u044c");
+            case "/search" -> {
+                awaitingCountry.add(chatId);
+                sendMessage(chatId, "\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u0441\u0442\u0440\u0430\u043d\u0443 \u0434\u043b\u044f \u043f\u043e\u0438\u0441\u043a\u0430 \u0442\u0443\u0440\u043e\u0432 (\u043d\u0430\u043f\u0440\u0438\u043c\u0435\u0440: \u0422\u0443\u0440\u0446\u0438\u044f, \u0415\u0433\u0438\u043f\u0435\u0442, \u041e\u0410\u042d)");
             }
+            default -> sendMessage(chatId, "\u041d\u0435 \u043f\u043e\u043d\u044f\u043b. /help \u2014 \u0441\u043f\u0438\u0441\u043e\u043a \u043a\u043e\u043c\u0430\u043d\u0434");
         }
     }
 
-    private void searchTours(long chatId, String country, String username) {
+    private void searchTours(long chatId, String country) {
         try {
             List<TourDto> tours = tourSearchController.search(country, null, "", 7, 2, 0).getBody();
-            int resultsCount = tours != null ? tours.size() : 0;
-            statsService.recordSearch(country, resultsCount);
-            notificationService.notifySearch(country, resultsCount);
-
+            if (statsService != null) statsService.recordSearch(country, null);
             if (tours == null || tours.isEmpty()) {
-                sendMessage(chatId, "Туры в \"" + country + "\" не найдены. Попробуйте другую страну.");
+                sendMessage(chatId, "\u0422\u0443\u0440\u044b \u0432 \"" + country + "\" \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d\u044b.\n/search \u2014 \u043d\u043e\u0432\u044b\u0439 \u043f\u043e\u0438\u0441\u043a");
             } else {
                 StringBuilder sb = new StringBuilder();
-                sb.append("Туры в \"").append(country).append("\":\n\n");
+                sb.append("\u0422\u0443\u0440\u044b \u0432 \"" + country + "\":\n\n");
                 int count = 1;
                 for (TourDto t : tours) {
                     sb.append(count++).append(". ").append(t.getHotelName()).append("\n");
                     sb.append("   ").append(t.getCity()).append(" | \u2b50").append(t.getRating()).append("\n");
                     sb.append("   ").append(t.getPrice()).append(" \u20bd\n\n");
                 }
-                sb.append("/search — новый поиск");
+                sb.append("/search \u2014 \u043d\u043e\u0432\u044b\u0439 \u043f\u043e\u0438\u0441\u043a");
                 sendMessage(chatId, sb.toString());
             }
         } catch (Exception e) {
-            statsService.recordError(e.getMessage());
-            notificationService.notifyError(e.getMessage());
-            sendMessage(chatId, "Ошибка при поиске туров. Попробуйте позже.\n/search — новый поиск");
+            if (statsService != null) statsService.recordError(e.getMessage());
+            sendMessage(chatId, "\u041e\u0448\u0438\u0431\u043a\u0430 \u043f\u0440\u0438 \u043f\u043e\u0438\u0441\u043a\u0435. /search \u2014 \u043f\u043e\u0432\u0442\u043e\u0440\u0438\u0442\u044c");
         }
     }
 
@@ -102,7 +91,6 @@ public class TourBot extends TelegramLongPollingBot {
 
     @Override
     public String getBotUsername() { return botUsername; }
-
     @Override
     public String getBotToken() { return botToken; }
 }
