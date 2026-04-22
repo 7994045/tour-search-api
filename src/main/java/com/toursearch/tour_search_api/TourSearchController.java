@@ -24,40 +24,51 @@ public class TourSearchController {
         return ResponseEntity.ok(getDemoTours(searchCountry, nights));
     }
 
+    @PostMapping("/search")
+    public ResponseEntity<List<TourDto>> searchPost(@RequestBody Map<String, Object> body) {
+        String country = (String) body.getOrDefault("from", body.getOrDefault("country", "Турция"));
+        String destination = (String) body.getOrDefault("to", body.getOrDefault("destination", ""));
+        String searchCountry = (country != null && !country.isEmpty()) ? country :
+                (destination != null && !destination.isEmpty()) ? destination : "Турция";
+        int nights = body.containsKey("nights") ? ((Number) body.get("nights")).intValue() : 7;
+        int adults = body.containsKey("adults") ? ((Number) body.get("adults")).intValue() : 2;
+        return ResponseEntity.ok(getDemoTours(searchCountry, nights));
+    }
+
     private List<TourDto> getDemoTours(String country, int nights) {
         Map<String, List<String>> resorts = Map.of(
-            "Турция", List.of("Анталья", "Аланья", "Кемер", "Сиде"),
-            "Египет", List.of("Шарм-эль-Шейх", "Хургада", "Марса-Алам"),
-            "ОАЭ", List.of("Дубай", "Шарджа", "Абу-Даби", "Рас-эль-Хайма"),
-            "Таиланд", List.of("Паттайя", "Пхукет", "Самуи", "Краби"),
-            "Шри-Ланка", List.of("Бентота", "Унаватуна", "Тангалле")
+                "Турция", List.of("Анталья", "Аланья", "Кемер", "Белек"),
+                "Египет", List.of("Шарм-эль-Шейх", "Хургада", "Клеопатра Люкс"),
+                "ОАЭ", List.of("Дубай", "Шарджа", "Абу-Даби", "Рас-эль-Хайма"),
+                "Таиланд", List.of("Паттайя", "Пхукет", "Самуи", "Краби"),
+                "Шри-Ланка", List.of("Бентота", "Чинамон Бей", "Тадж Бентота")
         );
 
         Map<String, List<String>> hotels = Map.of(
-            "Турция", List.of("Rixos Premium Belek", "Maxx Royal Kemer", "Titanic Deluxe", "Calista Luxury"),
-            "Египет", List.of("Steigenberger Al Dau", "Sunrise Grand Select", "Cleopatra Luxury"),
-            "ОАЭ", List.of("Atlantis The Palm", "Jumeirah Beach", "Rixos The Palm"),
-            "Таиланд", List.of("Centara Grand", "Hilton Phuket", "Amari Pattaya"),
-            "Шри-Ланка", List.of("Heritance Ahungalla", "Cinnamon Bey", "Taj Bentota")
+                "Турция", List.of("Rixos Premium Belek", "Maxx Royal Kemer", "Titanic Delux", "Calista Luxury"),
+                "Египет", List.of("Steigenberger Al Dau", "Sunrise Grand Select", "Cleopatra Luxury"),
+                "ОАЭ", List.of("Atlantis The Palm", "Jumeirah Beach", "Rixos The Palm"),
+                "Таиланд", List.of("Centara Grand", "Hilton Phuket", "Amar Pattaya"),
+                "Шри-Ланка", List.of("Heritance Ahungalla", "Cinnamon Bey", "Taj Bentota")
         );
 
         Map<String, List<Double>> ratings = Map.of(
-            "Турция", List.of(4.8, 4.9, 4.7, 4.5),
-            "Египет", List.of(4.6, 4.8, 4.3),
-            "ОАЭ", List.of(4.9, 4.7, 4.8),
-            "Таиланд", List.of(4.7, 4.5, 4.4),
-            "Шри-Ланка", List.of(4.6, 4.3, 4.4)
+                "Турция", List.of(4.8, 4.9, 4.7, 4.5),
+                "Египет", List.of(4.6, 4.8, 4.3),
+                "ОАЭ", List.of(4.9, 4.7, 4.8),
+                "Таиланд", List.of(4.7, 4.5, 4.4),
+                "Шри-Ланка", List.of(4.6, 4.3, 4.4)
         );
 
         Map<String, int[]> priceRange = Map.of(
-            "Турция", new int[]{85000, 250000},
-            "Египет", new int[]{65000, 180000},
-            "ОАЭ", new int[]{120000, 400000},
-            "Таиланд", new int[]{90000, 220000},
-            "Шри-Ланка", new int[]{75000, 190000}
+                "Турция", new int[]{85000, 250000},
+                "Египет", new int[]{65000, 180000},
+                "ОАЭ", new int[]{120000, 400000},
+                "Таиланд", new int[]{90000, 220000},
+                "Шри-Ланка", new int[]{75000, 190000}
         );
 
-        List<String> countryResorts = resorts.getOrDefault(country, List.of("Курорт"));
+        List<String> countryResorts = resorts.getOrDefault(country, List.of("Курорт " + country));
         List<String> countryHotels = hotels.getOrDefault(country, List.of("Отель " + country));
         List<Double> countryRatings = ratings.getOrDefault(country, List.of(4.0));
         int[] range = priceRange.getOrDefault(country, new int[]{50000, 150000});
@@ -72,14 +83,14 @@ public class TourSearchController {
             price = (price / 1000) * 1000;
 
             tours.add(TourDto.builder()
-                .hotelName(countryHotels.get(idx))
-                .rating(countryRatings.get(idx % countryRatings.size()))
-                .country(country)
-                .city(countryResorts.get(idx % countryResorts.size()))
-                .price(price)
-                .hotelImage("https://placehold.co/400x250?text=" + countryHotels.get(idx).replace(" ", "+"))
-                .bookUrl("https://germes-travel.ru/book?hotel=" + idx)
-                .build());
+                    .hotelName(countryHotels.get(idx))
+                    .rating(countryRatings.get(idx % countryRatings.size()))
+                    .country(country)
+                    .city(countryResorts.get(idx % countryResorts.size()))
+                    .price(price)
+                    .hotelImage("https://placehold.co/400x250?text=" + countryHotels.get(idx).replace(" ", "+"))
+                    .bookUrl("https://germes-travel.ru/book?hotel=" + idx)
+                    .build());
         }
 
         tours.sort(Comparator.comparingInt(TourDto::getPrice));
