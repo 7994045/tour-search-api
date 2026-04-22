@@ -1,87 +1,58 @@
 package com.toursearch.service;
 
 import org.springframework.stereotype.Service;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.ArrayList;
+import java.util.List;
+import java.time.LocalDateTime;
 
 @Service
 public class StatsService {
-
     private final AtomicLong totalSearches = new AtomicLong(0);
-    private final AtomicLong totalUsers = new AtomicLong(0);
     private final AtomicLong totalErrors = new AtomicLong(0);
-    private final ConcurrentLinkedDeque<LogEntry> recentSearches = new ConcurrentLinkedDeque<>();
-    private final ConcurrentLinkedDeque<LogEntry> recentErrors = new ConcurrentLinkedDeque<>();
+    private final List<SearchRecord> recentSearches = new ArrayList<>();
+    private final List<ErrorRecord> recentErrors = new ArrayList<>();
+    private static final int MAX_RECORDS = 50;
 
-    private static final int MAX_LOGS = 50;
-    private static final DateTimeFormatter FMT = DateTimeFormatter.ofPattern("dd.MM HH:mm");
-
-    public void recordSearch(String country, int resultsCount) {
+    public void recordSearch(String country, String city) {
         totalSearches.incrementAndGet();
-        recentSearches.addFirst(new LogEntry(country + " — " + resultsCount + " рез.", LocalDateTime.now()));
-        while (recentSearches.size() > MAX_LOGS) recentSearches.removeLast();
+        synchronized (recentSearches) {
+            recentSearches.add(new SearchRecord(country, city, LocalDateTime.now()));
+            if (recentSearches.size() > MAX_RECORDS) recentSearches.remove(0);
+        }
     }
 
-    public void recordUser(long chatId, String username) {
-        totalUsers.incrementAndGet();
-    }
-
-    public void recordError(String error) {
+    public void recordError(String message) {
         totalErrors.incrementAndGet();
-        recentErrors.addFirst(new LogEntry(error, LocalDateTime.now()));
-        while (recentErrors.size() > MAX_LOGS) recentErrors.removeLast();
+        synchronized (recentErrors) {
+            recentErrors.add(new ErrorRecord(message, LocalDateTime.now()));
+            if (recentErrors.size() > MAX_RECORDS) recentErrors.remove(0);
+        }
     }
 
     public long getTotalSearches() { return totalSearches.get(); }
-    public long getTotalUsers() { return totalUsers.get(); }
     public long getTotalErrors() { return totalErrors.get(); }
+    public List<SearchRecord> getRecentSearches() {
+        synchronized (recentSearches) { return new ArrayList<>(recentSearches); }
+    }
+    public List<ErrorRecord> getRecentErrors() {
+        synchronized (recentErrors) { return new ArrayList<>(recentErrors); }
+    }
 
-    public String getFullStats() {
-        StringBuilder sb = new StringBuilder();
-        sb.append("\u1f4ca Статистика Germes Travel:\n\n");
-        sb.append("\u1f50d Поисков: ").append(totalSearches.get()).append("\n");
-        sb.append("\u1f465 Пользователей: ").append(totalUsers.get()).append("\n");
-        sb.append("\u274c Ошибок: ").append(totalErrors.get()).append("\n\n");
-        sb.append("Последние поиски:\n");
-        int count = 0;
-        for (LogEntry log : recentSearches) {
-            if (count++ >= 5) break;
-            sb.append("\u2022 ").append(log.message).append(" (").append(log.time.format(FMT)).append(")\n");
+    public static class SearchRecord {
+        public final String country;
+        public final String city;
+        public final LocalDateTime time;
+        public SearchRecord(String country, String city, LocalDateTime time) {
+            this.country = country; this.city = city; this.time = time;
         }
-        return sb.toString();
     }
 
-    public String getUsersStats() {
-        return "\u1f465 Всего пользователей: " + totalUsers.get();
-    }
-
-    public String getSearchesStats() {
-        StringBuilder sb = new StringBuilder();
-        sb.append("\u1f50d Всего поисков: ").append(totalSearches.get()).append("\n\nПоследние:\n");
-        for (LogEntry log : recentSearches) {
-            sb.append("\u2022 ").append(log.message).append(" (").append(log.time.format(FMT)).append(")\n");
-        }
-        return sb.toString();
-    }
-
-    public String getErrorsStats() {
-        if (recentErrors.isEmpty()) return "\u2705 Ошибок нет!";
-        StringBuilder sb = new StringBuilder();
-        sb.append("\u274c Всего ошибок: ").append(totalErrors.get()).append("\n\nПоследние:\n");
-        for (LogEntry log : recentErrors) {
-            sb.append("\u2022 ").append(log.message).append(" (").append(log.time.format(FMT)).append(")\n");
-        }
-        return sb.toString();
-    }
-
-    private static class LogEntry {
-        final String message;
-        final LocalDateTime time;
-        LogEntry(String message, LocalDateTime time) {
-            this.message = message;
-            this.time = time;
+    public static class ErrorRecord {
+        public final String message;
+        public final LocalDateTime time;
+        public ErrorRecord(String message, LocalDateTime time) {
+            this.message = message; this.time = time;
         }
     }
 }
