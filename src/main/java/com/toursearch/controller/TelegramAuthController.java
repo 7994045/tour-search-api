@@ -8,7 +8,6 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.util.*;
 
 @RestController
@@ -94,7 +93,7 @@ public class TelegramAuthController {
                 hexHash.append(String.format("%02x", b));
             }
 
-n            return hexHash.toString().equals(hash);
+            return hexHash.toString().equals(hash);
         } catch (Exception e) {
             return false;
         }
