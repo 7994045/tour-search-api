@@ -12,23 +12,31 @@ import java.util.Date;
 @Service
 public class JwtService {
 
-    @Value("${jwt.secret:defaultSecretKeyWhichShouldBeAtLeast32CharsLong}")
+    @Value("${jwt.secret}")
     private String jwtSecret;
 
-    @Value("${jwt.expiration:86400000}")
-    private long jwtExpiration;
+    @Value("${jwt.expiration-days:30}")
+    private int expirationDays;
 
     private SecretKey getSigningKey() {
         byte[] keyBytes = jwtSecret.getBytes(StandardCharsets.UTF_8);
+        if (keyBytes.length < 32) {
+            byte[] padded = new byte[32];
+            System.arraycopy(keyBytes, 0, padded, 0, keyBytes.length);
+            keyBytes = padded;
+        }
         return Keys.hmacShaKeyFor(keyBytes);
     }
 
     public String generateToken(Long telegramId, String username) {
+        Date now = new Date();
+        Date expiryDate = new Date(now.getTime() + (long) expirationDays * 24 * 60 * 60 * 1000);
+
         return Jwts.builder()
                 .subject(String.valueOf(telegramId))
                 .claim("username", username)
-                .issuedAt(new Date())
-                .expiration(new Date(System.currentTimeMillis() + jwtExpiration))
+                .issuedAt(now)
+                .expiration(expiryDate)
                 .signWith(getSigningKey())
                 .compact();
     }
@@ -44,10 +52,7 @@ public class JwtService {
 
     public boolean validateToken(String token) {
         try {
-            Jwts.parser()
-                    .verifyWith(getSigningKey())
-                    .build()
-                    .parseSignedClaims(token);
+            Jwts.parser().verifyWith(getSigningKey()).build().parseSignedClaims(token);
             return true;
         } catch (JwtException | IllegalArgumentException e) {
             return false;
