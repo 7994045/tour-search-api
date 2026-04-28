@@ -1,5 +1,8 @@
 package com.toursearch.controller;
 
+import com.toursearch.model.User;
+import com.toursearch.repository.UserRepository;
+import com.toursearch.service.JwtService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -17,52 +20,136 @@ public class TelegramAuthController {
     @Value("${telegram.bot.token:}")
     private String botToken;
 
+    private final JwtService jwtService;
+    private final UserRepository userRepository;
+
+    public TelegramAuthController(JwtService jwtService, UserRepository userRepository) {
+        this.jwtService = jwtService;
+        this.userRepository = userRepository;
+    }
+
     @PostMapping("/telegram")
     public ResponseEntity<?> authTelegram(@RequestBody Map<String, Object> body) {
         String initData = (String) body.get("init_data");
 
         if (initData == null || initData.isEmpty()) {
-            // Fallback: accept user data without verification (for testing)
             Object userId = body.get("id");
             if (userId != null) {
+                Long tgId = Long.parseLong(String.valueOf(userId));
+                User user = userRepository.findByTelegramId(tgId)
+                        .orElseGet(() -> userRepository.save(User.builder()
+                                .telegramId(tgId)
+                                .firstName(String.valueOf(body.getOrDefault("first_name", "")))
+                                .lastName(String.valueOf(body.getOrDefault("last_name", "")))
+                                .username(body.get("username") != null ? String.valueOf(body.get("username")) : null)
+                                .languageCode(body.get("language_code") != null ? String.valueOf(body.get("language_code")) : null)
+                                .build()));
+
+                String token = jwtService.generateToken(user.getTelegramId(), user.getUsername());
                 Map<String, Object> result = new HashMap<>();
-                result.put("id", userId);
-                result.put("first_name", body.getOrDefault("first_name", ""));
-                result.put("last_name", body.getOrDefault("last_name", ""));
-                result.put("username", body.getOrDefault("username", ""));
                 result.put("authenticated", false);
+                result.put("token", token);
+                result.put("user", Map.of(
+                        "id", user.getTelegramId(),
+                        "first_name", user.getFirstName() != null ? user.getFirstName() : "",
+                        "last_name", user.getLastName() != null ? user.getLastName() : "",
+                        "username", user.getUsername() != null ? user.getUsername() : ""
+                ));
                 return ResponseEntity.ok(result);
             }
             return ResponseEntity.badRequest().body(Map.of("error", "init_data is required"));
         }
 
-        // Verify initData hash
         if (!verifyInitData(initData)) {
             return ResponseEntity.status(401).body(Map.of("error", "Invalid hash"));
         }
 
-        // Parse user data from initData
         Map<String, String> params = parseInitData(initData);
         String userJson = params.get("user");
 
-        Map<String, Object> result = new HashMap<>();
-        result.put("authenticated", true);
+        Long telegramId = null;
+        String firstName = "";
+        String lastName = "";
+        String username = "";
 
         if (userJson != null) {
-            // Parse user JSON manually (simple approach)
-            userJson = userJson.replace("{", "").replace("}", "");
-            String[] pairs = userJson.split(",");
+            String cleaned = userJson.replace("{", "").replace("}", "");
+            String[] pairs = cleaned.split(",");
+            Map<String, String> userFields = new HashMap<>();
             for (String pair : pairs) {
                 String[] kv = pair.split(":", 2);
                 if (kv.length == 2) {
-                    String key = kv[0].replace("\"", "").trim();
-                    String value = kv[1].replace("\"", "").trim();
-                    result.put(key, value);
+                    userFields.put(kv[0].replace("\"", "").trim(), kv[1].replace("\"", "").trim());
                 }
             }
+            telegramId = Long.parseLong(userFields.getOrDefault("id", "0"));
+            firstName = userFields.getOrDefault("first_name", "");
+            lastName = userFields.getOrDefault("last_name", "");
+            username = userFields.getOrDefault("username", "");
         }
 
+        if (telegramId == null || telegramId == 0) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Could not parse user"));
+        }
+
+        final Long tgId = telegramId;
+        User user = userRepository.findByTelegramId(tgId)
+                .map(existing -> {
+                    existing.setFirstName(firstName);
+                    existing.setLastName(lastName);
+                    existing.setUsername(username);
+                    return userRepository.save(existing);
+                })
+                .orElseGet(() -> userRepository.save(User.builder()
+                        .telegramId(tgId)
+                        .firstName(firstName)
+                        .lastName(lastName)
+                        .username(username)
+                        .build()));
+
+        String token = jwtService.generateToken(user.getTelegramId(), user.getUsername());
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("authenticated", true);
+        result.put("token", token);
+        result.put("user", Map.of(
+                "id", user.getTelegramId(),
+                "first_name", user.getFirstName() != null ? user.getFirstName() : "",
+                "last_name", user.getLastName() != null ? user.getLastName() : "",
+                "username", user.getUsername() != null ? user.getUsername() : ""
+        ));
         return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<?> getMe(@RequestAttribute("telegramId") Long telegramId) {
+        return userRepository.findByTelegramId(telegramId)
+                .map(user -> ResponseEntity.ok(Map.of(
+                        "id", user.getTelegramId(),
+                        "first_name", user.getFirstName() != null ? user.getFirstName() : "",
+                        "last_name", user.getLastName() != null ? user.getLastName() : "",
+                        "username", user.getUsername() != null ? user.getUsername() : "",
+                        "phone", user.getPhone() != null ? user.getPhone() : "",
+                        "email", user.getEmail() != null ? user.getEmail() : "",
+                        "city", user.getCity() != null ? user.getCity() : ""
+                )))
+                .orElse(ResponseEntity.status(404).body(Map.of("error", "User not found")));
+    }
+
+    @PostMapping("/profile")
+    public ResponseEntity<?> updateProfile(@RequestAttribute("telegramId") Long telegramId,
+                                          @RequestBody Map<String, String> body) {
+        return userRepository.findByTelegramId(telegramId)
+                .map(user -> {
+                    if (body.containsKey("phone")) user.setPhone(body.get("phone"));
+                    if (body.containsKey("email")) user.setEmail(body.get("email"));
+                    if (body.containsKey("city")) user.setCity(body.get("city"));
+                    if (body.containsKey("first_name")) user.setFirstName(body.get("first_name"));
+                    if (body.containsKey("last_name")) user.setLastName(body.get("last_name"));
+                    userRepository.save(user);
+                    return ResponseEntity.ok(Map.of("success", true));
+                })
+                .orElse(ResponseEntity.status(404).body(Map.of("error", "User not found")));
     }
 
     private boolean verifyInitData(String initData) {
@@ -71,23 +158,17 @@ public class TelegramAuthController {
             String hash = params.remove("hash");
             if (hash == null) return false;
 
-            // Sort remaining params
             List<String> keys = new ArrayList<>(params.keySet());
             Collections.sort(keys);
             StringBuilder dataCheckString = new StringBuilder();
             for (String key : keys) {
-                dataCheckString.append(key).append("=").append(params.get(key));
-                dataCheckString.append("\n");
+                dataCheckString.append(key).append("=").append(params.get(key)).append("\n");
             }
             dataCheckString.deleteCharAt(dataCheckString.length() - 1);
 
-            // Calculate secret key: SHA256("WebAppData", botToken)
             byte[] secretKey = hmacSha256("WebAppData", botToken);
-
-            // Calculate hash: HMAC-SHA256(secretKey, dataCheckString)
             byte[] computedHash = hmacSha256Bytes(secretKey, dataCheckString.toString());
 
-            // Convert to hex
             StringBuilder hexHash = new StringBuilder();
             for (byte b : computedHash) {
                 hexHash.append(String.format("%02x", b));
